@@ -236,6 +236,108 @@ router.put('/:id/cancel', authMiddleware, (req: AuthRequest, res: Response) => {
   }
 });
 
+// Update a ride (driver only, only when no passengers have joined)
+router.put('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
+  try {
+    const rideId = parseInt(paramValue(req.params.id), 10);
+    const { origin, destination, departure_time, car_model, total_seats, price_per_person, description } = req.body;
+
+    const ride = db.prepare('SELECT * FROM rides WHERE id = ?').get(rideId) as RideRow | undefined;
+    if (!ride) {
+      res.status(404).json({ error: '行程不存在' });
+      return;
+    }
+
+    if (ride.driver_id !== req.userId) {
+      res.status(403).json({ error: '只有行程发布者才能修改' });
+      return;
+    }
+
+    if (ride.status !== 'open') {
+      res.status(400).json({ error: '只能修改可预订状态的行程' });
+      return;
+    }
+
+    const approvedCount = db.prepare(
+      "SELECT COUNT(*) as count FROM ride_requests WHERE ride_id = ? AND status = 'approved'"
+    ).get(rideId) as { count: number };
+
+    if (approvedCount.count > 0) {
+      res.status(400).json({ error: '已有乘客加入，无法修改行程信息' });
+      return;
+    }
+
+    if (total_seats !== undefined) {
+      if (total_seats < 1 || total_seats > 8) {
+        res.status(400).json({ error: '可载人数范围1-8' });
+        return;
+      }
+    }
+
+    if (price_per_person !== undefined && price_per_person < 0) {
+      res.status(400).json({ error: '费用不能为负数' });
+      return;
+    }
+
+    const occupiedSeats = ride.total_seats - ride.available_seats;
+    const newTotalSeats = total_seats !== undefined ? total_seats : ride.total_seats;
+    const newAvailableSeats = newTotalSeats - occupiedSeats;
+
+    if (newAvailableSeats < 0) {
+      res.status(400).json({ error: '可载人数不能少于已占用座位数' });
+      return;
+    }
+
+    const updateFields: string[] = [];
+    const updateParams: (string | number)[] = [];
+
+    if (origin !== undefined) { updateFields.push('origin = ?'); updateParams.push(origin); }
+    if (destination !== undefined) { updateFields.push('destination = ?'); updateParams.push(destination); }
+    if (departure_time !== undefined) { updateFields.push('departure_time = ?'); updateParams.push(departure_time); }
+    if (car_model !== undefined) { updateFields.push('car_model = ?'); updateParams.push(car_model); }
+    if (total_seats !== undefined) {
+      updateFields.push('total_seats = ?');
+      updateParams.push(total_seats);
+      updateFields.push('available_seats = ?');
+      updateParams.push(newAvailableSeats);
+    }
+    if (price_per_person !== undefined) { updateFields.push('price_per_person = ?'); updateParams.push(price_per_person); }
+    if (description !== undefined) { updateFields.push('description = ?'); updateParams.push(description); }
+
+    if (updateFields.length === 0) {
+      res.status(400).json({ error: '没有需要更新的字段' });
+      return;
+    }
+
+    updateParams.push(rideId);
+    const updateSql = `UPDATE rides SET ${updateFields.join(', ')} WHERE id = ?`;
+    db.prepare(updateSql).run(...updateParams);
+
+    const pendingRiders = db.prepare(
+      "SELECT rider_id FROM ride_requests WHERE ride_id = ? AND status = 'pending'"
+    ).all(rideId) as { rider_id: number }[];
+
+    if (pendingRiders.length > 0) {
+      const insertNotif = db.prepare(
+        'INSERT INTO notifications (user_id, title, content) VALUES (?, ?, ?)'
+      );
+      const updatedRide = db.prepare('SELECT * FROM rides WHERE id = ?').get(rideId) as RideRow;
+      for (const r of pendingRiders) {
+        insertNotif.run(
+          r.rider_id,
+          '行程信息已更新',
+          `您申请的行程「${updatedRide.origin} → ${updatedRide.destination}」信息已更新，请留意`
+        );
+      }
+    }
+
+    res.json({ message: '行程更新成功' });
+  } catch (err) {
+    console.error('Update ride error:', err);
+    res.status(500).json({ error: '更新失败' });
+  }
+});
+
 // Complete a ride (driver only)
 router.put('/:id/complete', authMiddleware, (req: AuthRequest, res: Response) => {
   try {

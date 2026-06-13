@@ -156,6 +156,14 @@ export default function RideManagePage() {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
               {ride.status === 'open' && (
                 <>
+                  {ride.available_seats === ride.total_seats && (
+                    <button
+                      className="btn btn-sm btn-primary"
+                      onClick={() => navigate(`/edit-ride/${ride.id}`)}
+                    >
+                      修改行程
+                    </button>
+                  )}
                   <button
                     className="btn btn-sm btn-primary"
                     onClick={() => loadRequests(ride.id)}

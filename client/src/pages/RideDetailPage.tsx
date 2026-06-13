@@ -110,6 +110,7 @@ export default function RideDetailPage() {
   const isDriver = user?.id === ride.driver_id;
   const isCompleted = ride.status === 'completed';
   const canApply = user?.role === 'rider' && !isDriver && ride.status === 'open' && !myRequest;
+  const canEdit = isDriver && ride.status === 'open' && passengers.length === 0;
   const hasReviewed = (revieweeId: number) =>
     reviews.some(r => r.reviewer_id === user?.id && r.reviewee_id === revieweeId);
 
@@ -185,6 +186,11 @@ export default function RideDetailPage() {
                   myRequest.status === 'pending' ? '待审核' : myRequest.status === 'approved' ? '已通过' : '已拒绝'
                 }</span>
               </div>
+            )}
+            {canEdit && (
+              <button className="btn btn-primary" onClick={() => navigate(`/edit-ride/${ride.id}`)}>
+                修改行程
+              </button>
             )}
             {isDriver && ride.status === 'open' && pendingCount > 0 && (
               <button className="btn btn-warning" onClick={() => navigate('/ride-manage')}>

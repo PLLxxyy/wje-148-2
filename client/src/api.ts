@@ -80,6 +80,20 @@ export const api = {
   completeRide: (id: number) =>
     request<{ message: string }>(`/rides/${id}/complete`, { method: 'PUT' }),
 
+  updateRide: (id: number, data: {
+    origin?: string;
+    destination?: string;
+    departure_time?: string;
+    car_model?: string;
+    total_seats?: number;
+    price_per_person?: number;
+    description?: string;
+  }) =>
+    request<{ message: string }>(`/rides/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
   // Requests
   applyRide: (data: { ride_id: number; pickup_point: string; seats_needed?: number }) =>
     request<{ message: string; request: { id: number } }>('/requests', {

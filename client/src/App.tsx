@@ -32,6 +32,7 @@ export default function App() {
         <Route path="/auth" element={user ? <Navigate to="/" replace /> : <AuthPage />} />
         <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
         <Route path="/create-ride" element={<ProtectedRoute><CreateRidePage /></ProtectedRoute>} />
+        <Route path="/edit-ride/:rideId" element={<ProtectedRoute><CreateRidePage /></ProtectedRoute>} />
         <Route path="/ride/:id" element={<ProtectedRoute><RideDetailPage /></ProtectedRoute>} />
         <Route path="/my-rides" element={<ProtectedRoute><MyRidesPage /></ProtectedRoute>} />
         <Route path="/ride-manage" element={<ProtectedRoute><RideManagePage /></ProtectedRoute>} />

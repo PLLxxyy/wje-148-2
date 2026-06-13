@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import { api } from '../api';
+import type { Ride } from '../types';
 
 export default function CreateRidePage() {
   const { user } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const { rideId } = useParams<{ rideId?: string }>();
+  const isEdit = !!rideId;
 
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
@@ -17,6 +20,32 @@ export default function CreateRidePage() {
   const [pricePerPerson, setPricePerPerson] = useState(50);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(isEdit);
+
+  useEffect(() => {
+    if (isEdit && rideId) {
+      loadRideData();
+    }
+  }, [isEdit, rideId]);
+
+  async function loadRideData() {
+    try {
+      const res = await api.getRideDetail(parseInt(rideId!, 10));
+      const ride: Ride = res.ride;
+      setOrigin(ride.origin);
+      setDestination(ride.destination);
+      setDepartureTime(ride.departure_time.replace(' ', 'T').slice(0, 16));
+      setCarModel(ride.car_model);
+      setTotalSeats(ride.total_seats);
+      setPricePerPerson(ride.price_per_person);
+      setDescription(ride.description || '');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '加载行程信息失败', 'error');
+      navigate(-1);
+    } finally {
+      setInitialLoading(false);
+    }
+  }
 
   if (user?.role !== 'driver') {
     return (
@@ -29,6 +58,8 @@ export default function CreateRidePage() {
     );
   }
 
+  if (initialLoading) return <div className="main-content"><div className="loading">加载中...</div></div>;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!origin || !destination || !departureTime || !carModel) {
@@ -38,19 +69,33 @@ export default function CreateRidePage() {
 
     setLoading(true);
     try {
-      const res = await api.createRide({
-        origin,
-        destination,
-        departure_time: departureTime,
-        car_model: carModel,
-        total_seats: totalSeats,
-        price_per_person: pricePerPerson,
-        description,
-      });
-      showToast('行程发布成功', 'success');
-      navigate(`/ride/${res.ride.id}`);
+      if (isEdit) {
+        await api.updateRide(parseInt(rideId!, 10), {
+          origin,
+          destination,
+          departure_time: departureTime.replace('T', ' '),
+          car_model: carModel,
+          total_seats: totalSeats,
+          price_per_person: pricePerPerson,
+          description,
+        });
+        showToast('行程更新成功', 'success');
+        navigate(`/ride/${rideId}`);
+      } else {
+        const res = await api.createRide({
+          origin,
+          destination,
+          departure_time: departureTime.replace('T', ' '),
+          car_model: carModel,
+          total_seats: totalSeats,
+          price_per_person: pricePerPerson,
+          description,
+        });
+        showToast('行程发布成功', 'success');
+        navigate(`/ride/${res.ride.id}`);
+      }
     } catch (err) {
-      showToast(err instanceof Error ? err.message : '发布失败', 'error');
+      showToast(err instanceof Error ? err.message : (isEdit ? '更新失败' : '发布失败'), 'error');
     } finally {
       setLoading(false);
     }
@@ -59,7 +104,7 @@ export default function CreateRidePage() {
   return (
     <div className="main-content">
       <div style={{ maxWidth: 600, margin: '0 auto' }}>
-        <h2 className="page-title">发布新行程</h2>
+        <h2 className="page-title">{isEdit ? '修改行程' : '发布新行程'}</h2>
         <div className="detail-card">
           <form onSubmit={handleSubmit}>
             <div className="form-row">
@@ -143,7 +188,7 @@ export default function CreateRidePage() {
 
             <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
               <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-                {loading ? '发布中...' : '发布行程'}
+                {loading ? (isEdit ? '更新中...' : '发布中...') : (isEdit ? '保存修改' : '发布行程')}
               </button>
               <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>
                 取消
