@@ -32,6 +32,25 @@ export default function CreateRidePage() {
     try {
       const res = await api.getRideDetail(parseInt(rideId!, 10));
       const ride: Ride = res.ride;
+
+      if (ride.driver_id !== user?.id) {
+        showToast('只能修改自己发布的行程', 'error');
+        navigate(`/ride/${rideId}`, { replace: true });
+        return;
+      }
+
+      if (ride.status !== 'open') {
+        showToast('只能修改可预订状态的行程', 'error');
+        navigate(`/ride/${rideId}`, { replace: true });
+        return;
+      }
+
+      if (res.passengers.length > 0) {
+        showToast('已有乘客加入，无法修改行程信息', 'error');
+        navigate(`/ride/${rideId}`, { replace: true });
+        return;
+      }
+
       setOrigin(ride.origin);
       setDestination(ride.destination);
       setDepartureTime(ride.departure_time.replace(' ', 'T').slice(0, 16));

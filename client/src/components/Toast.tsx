@@ -10,7 +10,7 @@ interface ToastContextType {
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
-const ToastContext = createContext<ToastContextType | null>(null);
+export const ToastContext = createContext<ToastContextType | null>(null);
 
 let nextId = 0;
 
